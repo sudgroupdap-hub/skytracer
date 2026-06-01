@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0E1525">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Skytracer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #0E1525;
+      color: #FAF7F1;
+      font-family: 'Instrument Sans', system-ui, sans-serif;
+      font-weight: 400;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+    }
+
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      transition: opacity 0.3s ease;
+    }
+    .screen.hidden { opacity: 0; pointer-events: none; }
+
+    /* ---------- Welcome ---------- */
+    #welcome {
+      align-items: center; justify-content: center;
+      padding: 2rem; text-align: center;
+      background: radial-gradient(ellipse at top, #1a2440 0%, #0E1525 70%);
+    }
+    .logo-mark { margin-bottom: 3rem; }
+    .logo-mark svg { width: 260px; max-width: 80vw; height: auto; }
+    .tagline {
+      font-size: 11px; color: rgba(250, 247, 241, 0.4);
+      letter-spacing: 2px; margin-bottom: 3rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .begin-button {
+      background: #BA7517; color: #FAF7F1;
+      border: none; padding: 16px 56px;
+      font-size: 15px; font-weight: 500;
+      font-family: 'Instrument Sans', sans-serif;
+      letter-spacing: 0.5px; border-radius: 100px;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .begin-button:active { transform: scale(0.97); background: #854F0B; }
+    .permission-note {
+      font-size: 12px; color: rgba(250, 247, 241, 0.4);
+      margin-top: 2rem; max-width: 280px; line-height: 1.6;
+    }
+
+    /* ---------- Capture ---------- */
+    #capture { background: #000; }
+    #video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
+    .hud-top {
+      position: absolute; top: env(safe-area-inset-top, 16px);
+      left: 0; right: 0;
+      padding: 16px 20px;
+      display: flex; justify-content: space-between;
+      pointer-events: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px; color: rgba(250, 247, 241, 0.92);
+    }
+    .hud-block {
+      background: rgba(14, 21, 37, 0.55);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      padding: 8px 12px; border-radius: 8px;
+      border: 0.5px solid rgba(250, 247, 241, 0.12);
+      line-height: 1.55;
+    }
+    .hud-block .label {
+      display: inline-block; color: rgba(250, 247, 241, 0.45);
+      margin-right: 6px; min-width: 28px;
+    }
+    .hud-right { text-align: right; }
+
+    .preroll {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 16px) + 110px);
+      left: 50%; transform: translateX(-50%);
+      background: rgba(186, 117, 23, 0.88);
+      color: #FAF7F1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; padding: 5px 12px;
+      border-radius: 12px;
+      display: flex; align-items: center; gap: 8px;
+      letter-spacing: 1px; pointer-events: none;
+    }
+    .preroll-dot {
+      width: 6px; height: 6px;
+      background: #FAF7F1; border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.8); }
+    }
+
+    .reticle {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 64px; height: 64px; pointer-events: none;
+    }
+    .reticle .corner {
+      position: absolute; width: 12px; height: 12px;
+    }
+    .reticle .tl { top: 0; left: 0; border-top: 1.4px solid rgba(250,247,241,0.7); border-left: 1.4px solid rgba(250,247,241,0.7); }
+    .reticle .tr { top: 0; right: 0; border-top: 1.4px solid rgba(250,247,241,0.7); border-right: 1.4px solid rgba(250,247,241,0.7); }
+    .reticle .bl { bottom: 0; left: 0; border-bottom: 1.4px solid rgba(250,247,241,0.7); border-left: 1.4px solid rgba(250,247,241,0.7); }
+    .reticle .br { bottom: 0; right: 0; border-bottom: 1.4px solid rgba(250,247,241,0.7); border-right: 1.4px solid rgba(250,247,241,0.7); }
+    .reticle-center {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px; height: 4px;
+      background: #BA7517; border-radius: 50%;
+    }
+
+    .controls {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 60px 24px calc(32px + env(safe-area-inset-bottom, 0px));
+      display: flex; align-items: center; justify-content: space-around;
+      background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.65) 100%);
+    }
+    .control-button {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border: none; color: #FAF7F1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .capture-button {
+      width: 76px; height: 76px; border-radius: 50%;
+      background: #E24B4A; border: 4px solid #FAF7F1;
+      box-shadow: 0 0 0 2px rgba(250, 247, 241, 0.3);
+      cursor: pointer; transition: all 0.2s ease;
+      position: relative;
+    }
+    .capture-button:active { transform: scale(0.94); }
+    .capture-button.recording { animation: recording-pulse 1s ease-in-out infinite; }
+    .capture-button.recording::after {
+      content: ''; position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 26px; height: 26px;
+      background: #FAF7F1; border-radius: 4px;
+    }
+    @keyframes recording-pulse {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(250, 247, 241, 0.3); }
+      50% { box-shadow: 0 0 0 10px rgba(226, 75, 74, 0.22); }
+    }
+
+    /* ---------- Confirm ---------- */
+    #confirm {
+      background: #FAF7F1; color: #0E1525;
+      padding: 20px 24px calc(24px + env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+    }
+    .confirm-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: env(safe-area-inset-top, 16px); margin-bottom: 20px;
+    }
+    .close-btn {
+      background: none; border: none;
+      color: rgba(14, 21, 37, 0.65);
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 15px; cursor: pointer; padding: 4px 0;
+    }
+    .confirm-title { font-size: 15px; font-weight: 500; }
+    .clip-preview {
+      width: 100%; aspect-ratio: 16/10;
+      background: #1a2440; border-radius: 12px;
+      overflow: hidden; position: relative; margin-bottom: 20px;
+    }
+    .clip-preview video { width: 100%; height: 100%; object-fit: cover; }
+    .clip-duration {
+      position: absolute; bottom: 8px; left: 8px;
+      background: rgba(0,0,0,0.6); color: #FAF7F1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; padding: 3px 8px; border-radius: 4px;
+    }
+    .section-label {
+      font-size: 10px; color: rgba(14, 21, 37, 0.5);
+      text-transform: uppercase; letter-spacing: 1.2px;
+      margin-bottom: 8px; font-family: 'JetBrains Mono', monospace;
+    }
+    .headline-input {
+      width: 100%; background: rgba(14, 21, 37, 0.05);
+      border: none; border-radius: 8px;
+      padding: 12px 14px;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 14px; color: #0E1525; margin-bottom: 24px;
+    }
+    .headline-input:focus { outline: 1.5px solid #BA7517; }
+    .headline-input::placeholder { color: rgba(14, 21, 37, 0.35); }
+    .metadata-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-bottom: 28px;
+    }
+    .metadata-chip {
+      background: #E1F5EE; color: #085041;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px; padding: 5px 10px;
+      border-radius: 100px;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .metadata-chip svg { width: 10px; height: 10px; }
+    .submit-button {
+      width: 100%; background: #0E1525; color: #FAF7F1;
+      border: none; padding: 16px;
+      border-radius: 100px;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: 15px; font-weight: 500;
+      cursor: pointer; letter-spacing: 0.3px;
+    }
+    .submit-button:active { background: #1a2440; }
+    .submit-note {
+      font-size: 10px; color: rgba(14, 21, 37, 0.45);
+      text-align: center; margin-top: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.8px;
+    }
+
+    /* ---------- Success overlay ---------- */
+    .success-overlay {
+      position: fixed; inset: 0;
+      background: rgba(14, 21, 37, 0.96);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; color: #FAF7F1;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease; z-index: 1000;
+    }
+    .success-overlay.visible { opacity: 1; }
+    .success-mark {
+      width: 56px; height: 56px;
+      border: 1.5px solid #BA7517; border-radius: 50%;
+      margin-bottom: 20px; position: relative;
+    }
+    .success-mark::after {
+      content: ''; width: 14px; height: 7px;
+      border-left: 1.5px solid #BA7517;
+      border-bottom: 1.5px solid #BA7517;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -65%) rotate(-45deg);
+    }
+
+    .error-message {
+      position: fixed; bottom: 120px; left: 16px; right: 16px;
+      background: rgba(226, 75, 74, 0.92); color: #FAF7F1;
+      padding: 12px 16px; border-radius: 8px;
+      font-size: 13px; font-family: 'JetBrains Mono', monospace;
+      text-align: center; opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none; z-index: 100;
+    }
+    .error-message.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- ---------- Welcome screen ---------- -->
+<div class="screen" id="welcome">
+  <div class="logo-mark">
+    <svg viewBox="0 0 280 90" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 42 32 Q 180 -2 248 25" fill="none" stroke="#BA7517" stroke-width="1.1" opacity="0.65"/>
+      <circle cx="252" cy="25" r="2.8" fill="#BA7517"/>
+      <line x1="245" y1="18" x2="245" y2="21" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="245" y1="18" x2="248" y2="18" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="259" y1="18" x2="259" y2="21" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="259" y1="18" x2="256" y2="18" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="245" y1="32" x2="245" y2="29" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="245" y1="32" x2="248" y2="32" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="259" y1="32" x2="259" y2="29" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <line x1="259" y1="32" x2="256" y2="32" stroke="#FAF7F1" stroke-width="0.8" opacity="0.85"/>
+      <text x="22" y="61" font-family="Instrument Sans, sans-serif" font-size="24" font-weight="500" fill="#FAF7F1" letter-spacing="-0.5">skytracer</text>
+      <path d="M 22 81 Q 135 69 250 81" fill="none" stroke="#FAF7F1" stroke-width="0.7" opacity="0.7"/>
+    </svg>
+  </div>
+  <div class="tagline">PROTOTYPE · V0.0.1</div>
+  <button class="begin-button" id="begin-btn">Begin</button>
+  <div class="permission-note">
+    Skytracer needs access to your camera, location, and motion sensors to capture sightings with verifiable metadata.
+  </div>
+</div>
+
+<!-- ---------- Capture screen ---------- -->
+<div class="screen hidden" id="capture">
+  <video id="video" autoplay playsinline muted></video>
+
+  <div class="hud-top">
+    <div class="hud-block">
+      <div><span class="label">LAT</span><span id="hud-lat">--.----°</span></div>
+      <div><span class="label">LON</span><span id="hud-lon">--.----°</span></div>
+      <div><span class="label">HDG</span><span id="hud-heading">---°</span></div>
+    </div>
+    <div class="hud-block hud-right">
+      <div id="hud-time">--:--:--</div>
+      <div><span class="label">ALT</span><span id="hud-alt">---m</span></div>
+      <div><span class="label">TILT</span><span id="hud-tilt">+--°</span></div>
+    </div>
+  </div>
+
+  <div class="preroll">
+    <div class="preroll-dot"></div>
+    <span>READY TO CAPTURE</span>
+  </div>
+
+  <div class="reticle">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="reticle-center"></div>
+  </div>
+
+  <div class="controls">
+    <button class="control-button" aria-label="Flash">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+    </button>
+    <button class="capture-button" id="capture-btn" aria-label="Capture"></button>
+    <button class="control-button" aria-label="Switch camera">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 4v6h-6"></path>
+        <path d="M1 20v-6h6"></path>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path>
+        <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- ---------- Confirmation screen ---------- -->
+<div class="screen hidden" id="confirm">
+  <div class="confirm-header">
+    <button class="close-btn" id="back-btn">← Cancel</button>
+    <span class="confirm-title">New sighting</span>
+    <span style="width: 60px;"></span>
+  </div>
+
+  <div class="clip-preview">
+    <video id="preview-video" muted playsinline></video>
+    <div class="clip-duration" id="clip-duration">00:05</div>
+  </div>
+
+  <div class="section-label">Headline</div>
+  <input type="text" class="headline-input" id="headline" placeholder="Quick note about what you saw..." maxlength="80">
+
+  <div class="section-label">Auto-captured</div>
+  <div class="metadata-chips" id="metadata-chips"></div>
+
+  <button class="submit-button" id="submit-btn">Submit for review</button>
+  <div class="submit-note">DEMO · SUBMISSION STORED LOCALLY</div>
+</div>
+
+<!-- ---------- Overlays ---------- -->
+<div class="success-overlay" id="success">
+  <div class="success-mark"></div>
+  <div style="font-size: 17px; margin-bottom: 8px;">Sighting submitted</div>
+  <div style="font-size: 10px; color: rgba(250,247,241,0.45); font-family: 'JetBrains Mono', monospace; letter-spacing: 1.5px;">DEMO MODE · V0.0.1</div>
+</div>
+
+<div class="error-message" id="error"></div>
+
+<script>
+  const state = {
+    stream: null,
+    recorder: null,
+    chunks: [],
+    blob: null,
+    metadata: { lat: null, lon: null, heading: null, altitude: null, tilt: null, timestamp: null },
+    captureStartTime: null
+  };
+
+  const $welcome = document.getElementById('welcome');
+  const $capture = document.getElementById('capture');
+  const $confirm = document.getElementById('confirm');
+  const $error = document.getElementById('error');
+
+  function showScreen(name) {
+    [$welcome, $capture, $confirm].forEach(s => {
+      s.classList.toggle('hidden', s.id !== name);
+    });
+  }
+
+  function showError(message) {
+    $error.textContent = message;
+    $error.classList.add('visible');
+    setTimeout(() => $error.classList.remove('visible'), 3500);
+  }
+
+  // ---------- Clock ----------
+  function updateClock() {
+    const now = new Date();
+    const t = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    document.getElementById('hud-time').textContent = t;
+    state.metadata.timestamp = now.toISOString();
+  }
+  setInterval(updateClock, 1000);
+
+  // ---------- Geolocation ----------
+  function startGeolocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.watchPosition(
+      position => {
+        const { latitude, longitude, altitude } = position.coords;
+        state.metadata.lat = latitude;
+        state.metadata.lon = longitude;
+        state.metadata.altitude = altitude;
+        document.getElementById('hud-lat').textContent = formatCoord(latitude, 'N', 'S');
+        document.getElementById('hud-lon').textContent = formatCoord(longitude, 'E', 'W');
+        document.getElementById('hud-alt').textContent = altitude != null ? `${Math.round(altitude)}m` : '---m';
+      },
+      err => {
+        document.getElementById('hud-lat').textContent = 'denied';
+        document.getElementById('hud-lon').textContent = '';
+      },
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+    );
+  }
+
+  function formatCoord(value, pos, neg) {
+    if (value == null) return '--.----°';
+    const dir = value >= 0 ? pos : neg;
+    return `${Math.abs(value).toFixed(4)}°${dir}`;
+  }
+
+  // ---------- Device orientation ----------
+  function startOrientation() {
+    window.addEventListener('deviceorientation', event => {
+      const heading = event.webkitCompassHeading != null
+        ? event.webkitCompassHeading
+        : (event.alpha != null ? (360 - event.alpha) % 360 : null);
+      const tilt = event.beta;
+
+      if (heading != null) {
+        state.metadata.heading = heading;
+        const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+        const compass = dirs[Math.round(heading / 45) % 8];
+        document.getElementById('hud-heading').textContent = `${Math.round(heading)}° ${compass}`;
+      }
+      if (tilt != null) {
+        state.metadata.tilt = tilt;
+        const sign = tilt >= 0 ? '+' : '';
+        document.getElementById('hud-tilt').textContent = `${sign}${Math.round(tilt)}°`;
+      }
+    }, true);
+  }
+
+  // ---------- Begin ----------
+  document.getElementById('begin-btn').addEventListener('click', async () => {
+    try {
+      state.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: true
+      });
+
+      document.getElementById('video').srcObject = state.stream;
+
+      startGeolocation();
+
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission === 'granted') startOrientation();
+        } catch (e) {
+          startOrientation();
+        }
+      } else {
+        startOrientation();
+      }
+
+      showScreen('capture');
+    } catch (err) {
+      console.error(err);
+      showError('Camera access required. Please grant permissions and try again.');
+    }
+  });
+
+  // ---------- Capture ----------
+  document.getElementById('capture-btn').addEventListener('click', () => {
+    if (!state.stream) return;
+    if (state.recorder && state.recorder.state === 'recording') return;
+
+    const btn = document.getElementById('capture-btn');
+    state.chunks = [];
+
+    let mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'video/webm';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/mp4';
+      }
+    }
+
+    try {
+      state.recorder = new MediaRecorder(state.stream, { mimeType });
+    } catch (e) {
+      state.recorder = new MediaRecorder(state.stream);
+    }
+
+    state.recorder.ondataavailable = e => {
+      if (e.data.size > 0) state.chunks.push(e.data);
+    };
+
+    state.recorder.onstop = () => {
+      btn.classList.remove('recording');
+      state.blob = new Blob(state.chunks, { type: state.recorder.mimeType || 'video/webm' });
+      showConfirmScreen();
+    };
+
+    state.recorder.start();
+    state.captureStartTime = Date.now();
+    btn.classList.add('recording');
+
+    setTimeout(() => {
+      if (state.recorder && state.recorder.state === 'recording') {
+        state.recorder.stop();
+      }
+    }, 5000);
+  });
+
+  // ---------- Confirm ----------
+  function showConfirmScreen() {
+    const url = URL.createObjectURL(state.blob);
+    const previewVideo = document.getElementById('preview-video');
+    previewVideo.src = url;
+    previewVideo.play().catch(() => {});
+    previewVideo.loop = true;
+
+    const duration = Math.max(1, Math.round((Date.now() - state.captureStartTime) / 1000));
+    document.getElementById('clip-duration').textContent = `00:0${duration}`;
+
+    const chips = document.getElementById('metadata-chips');
+    chips.innerHTML = '';
+    const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    const meta = state.metadata;
+    const items = [
+      meta.lat != null ? `Location ${meta.lat.toFixed(3)}°, ${meta.lon.toFixed(3)}°` : null,
+      meta.heading != null ? `Heading ${Math.round(meta.heading)}°` : null,
+      `Time ${new Date().toLocaleTimeString()}`,
+      meta.altitude != null ? `Altitude ${Math.round(meta.altitude)}m` : null,
+      meta.tilt != null ? `Tilt ${Math.round(meta.tilt)}°` : null,
+      `Duration ${duration}s`
+    ].filter(Boolean);
+    items.forEach(text => {
+      const chip = document.createElement('span');
+      chip.className = 'metadata-chip';
+      chip.innerHTML = checkIcon + text;
+      chips.appendChild(chip);
+    });
+
+    showScreen('confirm');
+  }
+
+  document.getElementById('back-btn').addEventListener('click', () => {
+    const preview = document.getElementById('preview-video');
+    preview.pause();
+    if (preview.src) URL.revokeObjectURL(preview.src);
+    preview.removeAttribute('src');
+    preview.load();
+    showScreen('capture');
+  });
+
+  document.getElementById('submit-btn').addEventListener('click', () => {
+    const success = document.getElementById('success');
+    success.classList.add('visible');
+    setTimeout(() => {
+      success.classList.remove('visible');
+      document.getElementById('headline').value = '';
+      const preview = document.getElementById('preview-video');
+      preview.pause();
+      if (preview.src) URL.revokeObjectURL(preview.src);
+      preview.removeAttribute('src');
+      preview.load();
+      showScreen('capture');
+    }, 2400);
+  });
+</script>
+
+</body>
+</html>
